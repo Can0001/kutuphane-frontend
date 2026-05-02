@@ -47,59 +47,57 @@ export default function AddBook() {
   };
 
   return (
-    <div className="min-h-screen bg-[#0f1117] flex items-center justify-center p-6 antialiased">
-      <div className="w-full max-w-2xl">
-        {/* Geri Butonu */}
-        <button
-          onClick={() => router.back()}
-          className="flex items-center gap-2 text-white/30 hover:text-white/70 transition-colors text-xs font-black uppercase tracking-widest mb-8"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Geri Dön
+    <div style={{ minHeight: "100%", background: "#080c18", padding: "36px 48px", display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ width: "100%", maxWidth: "800px" }}>
+        
+        <button onClick={() => router.back()} style={{
+          display: "flex", alignItems: "center", gap: "8px", background: "transparent", border: "none", color: "rgba(255,255,255,0.4)", fontSize: "11px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em", cursor: "pointer", marginBottom: "32px", transition: "color 0.2s"
+        }} onMouseEnter={e => e.currentTarget.style.color = "rgba(255,255,255,0.8)"} onMouseLeave={e => e.currentTarget.style.color = "rgba(255,255,255,0.4)"}>
+          <span style={{ fontSize: "16px" }}>‹</span> Geri Dön
         </button>
 
-        <div className="bg-[#161b27] border border-white/5 rounded-3xl p-10">
-          {/* Başlık */}
-          <div className="mb-10 pb-8 border-b border-white/5">
-            <div className="flex items-center gap-3 mb-2">
-              <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-base shadow-lg shadow-indigo-500/30">
+        <div style={{ background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.05)", borderRadius: "24px", padding: "40px", boxShadow: "0 20px 40px rgba(0,0,0,0.2)" }}>
+          
+          {/* Header */}
+          <div style={{ marginBottom: "32px", paddingBottom: "24px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <div style={{ display: "flex", alignItems: "center", gap: "16px", marginBottom: "8px" }}>
+              <div style={{ width: "48px", height: "48px", borderRadius: "14px", background: "linear-gradient(135deg, #6366f1, #7c3aed)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "20px", boxShadow: "0 8px 16px rgba(99,102,241,0.3)" }}>
                 📕
               </div>
-              <h1 className="text-2xl font-black text-white tracking-tighter uppercase">Yeni Kitap Ekle</h1>
+              <h1 style={{ fontSize: "28px", fontWeight: 900, color: "#fff", textTransform: "uppercase", letterSpacing: "-0.02em", margin: 0 }}>Yeni Kitap Ekle</h1>
             </div>
-            <p className="text-[10px] text-white/20 font-bold uppercase tracking-[0.3em] ml-12">Kütüphane Envanter Sistemi</p>
+            <p style={{ fontSize: "11px", color: "rgba(255,255,255,0.3)", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.2em", margin: "0 0 0 64px" }}>Kütüphane Envanter Sistemi</p>
           </div>
 
-          <form onSubmit={handleAddBook} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+          <form onSubmit={handleAddBook} style={{ display: "flex", flexDirection: "column", gap: "32px" }}>
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "32px" }}>
+              
               {/* Kapak Resmi */}
-              <div className="flex flex-col">
-                <label className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-3">
-                  Kapak Görseli
-                </label>
-                <label className="relative flex-1 min-h-64 border-2 border-dashed border-white/10 rounded-2xl overflow-hidden cursor-pointer group hover:border-indigo-500/50 transition-all">
+              <div style={{ display: "flex", flexDirection: "column" }}>
+                <label style={{ fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", letterSpacing: "0.15em", marginBottom: "12px" }}>Kapak Görseli</label>
+                <label style={{
+                  position: "relative", flex: 1, minHeight: "260px", border: "2px dashed rgba(255,255,255,0.1)", borderRadius: "20px", overflow: "hidden", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", background: "rgba(255,255,255,0.01)", transition: "all 0.2s"
+                }} onMouseEnter={e => { e.currentTarget.style.borderColor = "rgba(99,102,241,0.5)"; e.currentTarget.style.background = "rgba(99,102,241,0.05)"; }} onMouseLeave={e => { e.currentTarget.style.borderColor = "rgba(255,255,255,0.1)"; e.currentTarget.style.background = "rgba(255,255,255,0.01)"; }}>
                   {previewUrl ? (
                     <>
-                      <img src={previewUrl} className="absolute inset-0 w-full h-full object-cover" alt="Önizleme" />
-                      <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-all flex items-center justify-center">
-                        <p className="text-white text-xs font-black uppercase tracking-widest">Değiştir</p>
+                      <img src={previewUrl} style={{ position: "absolute", inset: 0, width: "100%", height: "100%", objectFit: "cover" }} alt="Önizleme" />
+                      <div style={{ position: "absolute", inset: 0, background: "rgba(0,0,0,0.6)", opacity: 0, display: "flex", alignItems: "center", justifyContent: "center", transition: "opacity 0.2s" }} onMouseEnter={e => e.currentTarget.style.opacity = "1"} onMouseLeave={e => e.currentTarget.style.opacity = "0"}>
+                        <p style={{ color: "#fff", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em" }}>Değiştir</p>
                       </div>
                     </>
                   ) : (
-                    <div className="absolute inset-0 flex flex-col items-center justify-center gap-3">
-                      <div className="w-14 h-14 rounded-2xl bg-white/5 flex items-center justify-center text-2xl">📸</div>
-                      <p className="text-[10px] font-black text-white/20 uppercase tracking-widest">Görsel Seç</p>
-                      <p className="text-[9px] text-white/10">JPG, PNG, WEBP</p>
+                    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: "12px" }}>
+                      <div style={{ width: "56px", height: "56px", borderRadius: "16px", background: "rgba(255,255,255,0.05)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "24px" }}>📸</div>
+                      <p style={{ fontSize: "12px", fontWeight: 800, color: "rgba(255,255,255,0.3)", textTransform: "uppercase", letterSpacing: "0.15em", margin: 0 }}>Görsel Seç</p>
+                      <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.15)", margin: 0 }}>JPG, PNG, WEBP</p>
                     </div>
                   )}
-                  <input type="file" accept="image/*" onChange={handleFileChange} className="sr-only" />
+                  <input type="file" accept="image/*" onChange={handleFileChange} style={{ display: "none" }} />
                 </label>
               </div>
 
               {/* Form Alanları */}
-              <div className="flex flex-col justify-center space-y-4">
+              <div style={{ display: "flex", flexDirection: "column", gap: "16px", justifyContent: "center" }}>
                 {[
                   { key: "title", label: "Kitap Adı", type: "text" },
                   { key: "author", label: "Yazar", type: "text" },
@@ -107,13 +105,17 @@ export default function AddBook() {
                   { key: "pageCount", label: "Sayfa Sayısı", type: "number" },
                 ].map((field) => (
                   <div key={field.key}>
-                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-2 block">
+                    <label style={{ display: "block", fontSize: "11px", fontWeight: 800, textTransform: "uppercase", color: "rgba(255,255,255,0.4)", letterSpacing: "0.15em", marginBottom: "8px" }}>
                       {field.label}
                     </label>
                     <input
                       type={field.type}
                       required
-                      className="w-full bg-white/5 border border-white/10 text-white placeholder-white/15 rounded-xl px-4 py-3 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/8 transition-all"
+                      style={{
+                        width: "100%", background: "rgba(255,255,255,0.03)", border: "1px solid rgba(255,255,255,0.08)", color: "#fff", borderRadius: "12px", padding: "14px 16px", fontSize: "14px", outline: "none", transition: "all 0.2s", boxSizing: "border-box"
+                      }}
+                      onFocus={e => { e.target.style.borderColor = "rgba(99,102,241,0.6)"; e.target.style.background = "rgba(255,255,255,0.06)"; }}
+                      onBlur={e => { e.target.style.borderColor = "rgba(255,255,255,0.08)"; e.target.style.background = "rgba(255,255,255,0.03)"; }}
                       value={(formData as any)[field.key]}
                       onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
                     />
@@ -123,32 +125,24 @@ export default function AddBook() {
             </div>
 
             {/* Butonlar */}
-            <div className="flex gap-4 pt-4 border-t border-white/5">
-              <button
-                type="button"
-                onClick={() => router.back()}
-                className="flex-1 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest"
-              >
+            <div style={{ display: "flex", gap: "16px", paddingTop: "24px", borderTop: "1px solid rgba(255,255,255,0.06)" }}>
+              <button type="button" onClick={() => router.back()} style={{
+                flex: 1, padding: "16px", borderRadius: "16px", background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.5)", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em", cursor: "pointer", transition: "all 0.2s"
+              }} onMouseEnter={e => { e.currentTarget.style.background = "rgba(255,255,255,0.08)"; e.currentTarget.style.color = "rgba(255,255,255,0.8)"}} onMouseLeave={e => { e.currentTarget.style.background = "rgba(255,255,255,0.04)"; e.currentTarget.style.color = "rgba(255,255,255,0.5)"}}>
                 Vazgeç
               </button>
-              <button
-                type="submit"
-                disabled={isSubmitting}
-                className="flex-[2] py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-50"
-              >
+              <button type="submit" disabled={isSubmitting} style={{
+                flex: 2, padding: "16px", borderRadius: "16px", background: "linear-gradient(135deg, #4f46e5, #7c3aed)", border: "none", color: "#fff", fontSize: "12px", fontWeight: 800, textTransform: "uppercase", letterSpacing: "0.15em", cursor: isSubmitting ? "not-allowed" : "pointer", opacity: isSubmitting ? 0.6 : 1, boxShadow: "0 12px 24px rgba(99,102,241,0.3)", transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center", gap: "12px"
+              }}>
                 {isSubmitting ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <span className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
-                    Kaydediliyor...
-                  </span>
-                ) : (
-                  "Envantere Ekle"
-                )}
+                  <><span style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.8s linear infinite" }} />Kaydediliyor...</>
+                ) : "Envantere Ekle"}
               </button>
             </div>
           </form>
         </div>
       </div>
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
     </div>
   );
 }

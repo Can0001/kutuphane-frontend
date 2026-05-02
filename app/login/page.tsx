@@ -1,143 +1,169 @@
 "use client";
+
 import { useState } from "react";
 import axios from "axios";
 import Swal from "sweetalert2";
 import { useRouter } from "next/navigation";
+import { useAuth } from "@/contexts/AuthContext";
+import { setCookie } from "@/lib/auth";
 
-export default function Login() {
-  const [email, setEmail] = useState("");
+const API = "https://localhost:7069/api";
+
+export default function LoginPage() {
+  const [email, setEmail]       = useState("");
   const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-  const router = useRouter();
+  const [loading, setLoading]   = useState(false);
+  const router   = useRouter();
+  const { setToken } = useAuth();
 
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
 
     try {
-      const response = await axios.post("https://localhost:7069/api/Auth/login", {
-        email: email,
-        password: password,
-      });
+      const res = await axios.post(`${API}/Auth/login`, { email, password });
+      const { token, role, firstName, lastName } = res.data;
 
-      const token = response.data.token;
-      localStorage.setItem("LibraryAuthToken", token);
+      // ── 1. Kullanıcı adını localStorage'a ÖNCE yaz ───────────────
+      //    setToken → buildState → extractName sırasında okunabilsin
+      const userName = `${firstName ?? ""} ${lastName ?? ""}`.trim();
+      if (userName) localStorage.setItem("userName", userName);
 
+      // ── 2. Context'e token'ı ver (JWT decode + state güncelle) ──
+      setToken(token);
+
+      // ── 3. Middleware cookie'yi okuyabilsin diye kaydet ──────────
+      setCookie("auth_token", token);
+      // Rolü normalize et (API "admin" döndürebilir → "Admin" kaydedelim)
+      if (role) {
+        const normalizedRole = role.charAt(0).toUpperCase() + role.slice(1).toLowerCase();
+        setCookie("user_role", normalizedRole);
+      }
+
+      // ── 4. Dashboard'a yönlendir ─────────────────────────────────
       router.push("/dashboard");
 
+
     } catch (error: unknown) {
-      console.error("Login hatası:", error);
       setLoading(false);
+      let msg = "E-posta veya şifre hatalı.";
 
-      let errorMessage = "E-posta veya şifre eşleşmiyor. Lütfen yetkilerinizi kontrol edin.";
-
-      if (
-        error instanceof Error &&
-        (error.message.includes("Network Error") || error.message.includes("ERR_CERT"))
-      ) {
-        errorMessage =
-          "Sunucuya bağlanılamadı. Lütfen https://localhost:7069 adresini tarayıcıda açıp sertifikayı kabul edin, ardından tekrar deneyin.";
+      if (axios.isAxiosError(error)) {
+        if (!error.response) {
+          msg = "Sunucuya bağlanılamadı. https://localhost:7069 adresini tarayıcıda açıp sertifikayı kabul edin.";
+        } else if (error.response.status === 401) {
+          msg = "E-posta veya şifre hatalı.";
+        } else {
+          msg = error.response.data?.message ?? "Giriş başarısız.";
+        }
       }
 
       Swal.fire({
-        title: '<span style="color: #fff; font-weight: 900; text-transform: uppercase;">Erişim Reddedildi</span>',
-        text: errorMessage,
-        icon: "error",
-        background: "#161b27",
-        color: "#fff",
-        confirmButtonColor: "#ef4444",
-        confirmButtonText: "TEKRAR DENE",
-        customClass: {
-          popup: "rounded-[2.5rem] border border-white/5 shadow-2xl shadow-red-500/10",
-          confirmButton: "rounded-xl px-8 py-3 text-[11px] font-black uppercase tracking-widest",
-        }
+        title: "Erişim Reddedildi", text: msg, icon: "error",
+        background: "#0f1629", color: "#fff",
+        confirmButtonColor: "#4f46e5", confirmButtonText: "Tekrar Dene",
       });
     }
   };
 
-  return (
-    <div className="relative flex min-h-screen items-center justify-center bg-[#0f1117] font-sans antialiased overflow-hidden">
-      
-      {/* Arka Plan Dekoratif Işıklar */}
-      <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-indigo-600/10 blur-[120px] rounded-full" />
-      <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 blur-[120px] rounded-full" />
+  /* ── Giriş alanı yardımcısı ─────────────────────────────────────────────── */
+  const inputStyle: React.CSSProperties = {
+    width: "100%", padding: "13px 16px 13px 44px",
+    background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.09)",
+    borderRadius: "14px", color: "#fff", fontSize: "14px", outline: "none",
+    boxSizing: "border-box", transition: "border-color 0.2s",
+  };
 
-      <div className="relative w-full max-w-md px-6">
-        {/* Logo Bölümü */}
-        <div className="mb-12 text-center">
-          <div className="inline-flex items-center justify-center w-20 h-20 rounded-[2rem] bg-gradient-to-br from-indigo-500 to-purple-600 shadow-2xl shadow-indigo-500/20 mb-6 group transition-transform hover:scale-110 duration-500">
-            <span className="text-4xl">📚</span>
-          </div>
-          <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic">
-            Kütüphane <span className="text-indigo-500">Otomasyonu</span>
+  return (
+    <div style={{
+      minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center",
+      background: "#080c18", fontFamily: "'Inter', system-ui, sans-serif",
+      position: "relative", overflow: "hidden",
+    }}>
+      {/* BG glows */}
+      <div style={{ position: "absolute", top: "-20%", left: "-15%", width: "50%", height: "50%", background: "radial-gradient(circle, rgba(79,70,229,0.12) 0%, transparent 70%)", pointerEvents: "none" }} />
+      <div style={{ position: "absolute", bottom: "-20%", right: "-15%", width: "50%", height: "50%", background: "radial-gradient(circle, rgba(124,58,237,0.1) 0%, transparent 70%)", pointerEvents: "none" }} />
+
+      <div style={{ position: "relative", width: "100%", maxWidth: "420px", padding: "0 24px" }}>
+        {/* Logo */}
+        <div style={{ textAlign: "center", marginBottom: "40px" }}>
+          <div style={{
+            display: "inline-flex", alignItems: "center", justifyContent: "center",
+            width: "72px", height: "72px", borderRadius: "20px",
+            background: "linear-gradient(135deg, #4f46e5, #7c3aed)",
+            boxShadow: "0 20px 48px rgba(79,70,229,0.4)",
+            marginBottom: "20px", fontSize: "32px",
+          }}>📖</div>
+          <h1 style={{ fontSize: "26px", fontWeight: 900, color: "#fff", letterSpacing: "-0.02em", margin: "0 0 6px" }}>
+            Biblios<span style={{ color: "#818cf8" }}>Hub</span>
           </h1>
-          <p className="text-[10px] font-bold text-white/20 uppercase tracking-[0.5em] mt-3">
-            Merkezi Yönetim Terminali
+          <p style={{ fontSize: "10px", color: "rgba(255,255,255,0.18)", fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase" }}>
+            Kütüphane Yönetim Sistemi
           </p>
         </div>
 
-        {/* Login Kartı */}
-        <div className="rounded-[3rem] bg-[#161b27] p-10 shadow-2xl border border-white/5 backdrop-blur-sm">
-          <form onSubmit={handleLogin} className="space-y-8">
-            
-            {/* E-Posta Grubu */}
-            <div className="space-y-3">
-              <label className="block text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2">
-                E-Posta Adresi
-              </label>
-              <div className="relative group">
-                <input
-                  type="email"
-                  className="w-full rounded-2xl bg-white/5 border border-white/5 px-6 py-4 text-sm text-white placeholder-white/10 outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all pl-14"
-                  placeholder="admin@mail.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  required
-                />
-                <span className="absolute left-6 top-4 opacity-20 group-focus-within:opacity-100 transition-opacity">📧</span>
+        {/* Card */}
+        <div style={{
+          background: "rgba(255,255,255,0.025)", border: "1px solid rgba(255,255,255,0.07)",
+          borderRadius: "24px", padding: "36px", backdropFilter: "blur(12px)",
+          boxShadow: "0 32px 64px rgba(0,0,0,0.4)",
+        }}>
+          <div style={{ marginBottom: "28px" }}>
+            <div style={{ fontSize: "16px", fontWeight: 800, color: "#f1f5f9", marginBottom: "4px" }}>Sisteme Giriş</div>
+            <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.22)" }}>Yetkili personel girişi</div>
+          </div>
+
+          <form onSubmit={handleLogin} style={{ display: "flex", flexDirection: "column", gap: "16px" }}>
+            {/* Email */}
+            <div>
+              <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "rgba(255,255,255,0.28)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>E-Posta</label>
+              <div style={{ position: "relative" }}>
+                <input id="login-email" type="email" required placeholder="personel@kutuphane.com"
+                  value={email} onChange={(e) => setEmail(e.target.value)} style={inputStyle}
+                  onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = "rgba(99,102,241,0.6)")}
+                  onBlur={(e)  => ((e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.09)")} />
+                <span style={{ position: "absolute", left: "16px", top: "14px", fontSize: "16px", opacity: 0.3 }}>📧</span>
               </div>
             </div>
 
-            {/* Şifre Grubu */}
-            <div className="space-y-3">
-              <label className="block text-[10px] font-black text-white/30 uppercase tracking-[0.2em] ml-2">
-                Güvenlik Anahtarı
-              </label>
-              <div className="relative group">
-                <input
-                  type="password"
-                  className="w-full rounded-2xl bg-white/5 border border-white/5 px-6 py-4 text-sm text-white placeholder-white/10 outline-none focus:border-indigo-500/50 focus:bg-white/10 transition-all pl-14"
-                  placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  required
-                />
-                <span className="absolute left-6 top-4 opacity-20 group-focus-within:opacity-100 transition-opacity">🔑</span>
+            {/* Password */}
+            <div>
+              <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "rgba(255,255,255,0.28)", letterSpacing: "0.15em", textTransform: "uppercase", marginBottom: "8px" }}>Şifre</label>
+              <div style={{ position: "relative" }}>
+                <input id="login-password" type="password" required placeholder="••••••••"
+                  value={password} onChange={(e) => setPassword(e.target.value)} style={inputStyle}
+                  onFocus={(e) => ((e.target as HTMLInputElement).style.borderColor = "rgba(99,102,241,0.6)")}
+                  onBlur={(e)  => ((e.target as HTMLInputElement).style.borderColor = "rgba(255,255,255,0.09)")} />
+                <span style={{ position: "absolute", left: "16px", top: "14px", fontSize: "16px", opacity: 0.3 }}>🔑</span>
               </div>
             </div>
 
-            {/* Giriş Butonu */}
-            <button
-              type="submit"
-              disabled={loading}
-              className={`w-full rounded-2xl bg-gradient-to-r from-indigo-600 to-indigo-700 px-6 py-5 text-xs font-black text-white uppercase tracking-[0.3em] shadow-xl shadow-indigo-500/20 hover:from-indigo-500 hover:to-indigo-600 transition-all active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed`}
-            >
+            {/* Submit */}
+            <button type="submit" disabled={loading} style={{
+              marginTop: "8px", width: "100%", padding: "14px", borderRadius: "14px", border: "none",
+              background: loading ? "rgba(99,102,241,0.4)" : "linear-gradient(135deg,#4f46e5,#7c3aed)",
+              color: "#fff", fontSize: "13px", fontWeight: 800,
+              cursor: loading ? "not-allowed" : "pointer",
+              letterSpacing: "0.06em", textTransform: "uppercase",
+              boxShadow: loading ? "none" : "0 8px 28px rgba(79,70,229,0.4)",
+              display: "flex", alignItems: "center", justifyContent: "center", gap: "10px",
+            }}>
               {loading ? (
-                <div className="flex items-center justify-center gap-2">
-                  <div className="w-4 h-4 border-2 border-white/20 border-t-white rounded-full animate-spin" />
-                  Sorgulanıyor...
-                </div>
-              ) : (
-                "Sisteme Giriş Yap"
-              )}
+                <>
+                  <span style={{ width: "16px", height: "16px", border: "2px solid rgba(255,255,255,0.3)", borderTopColor: "#fff", borderRadius: "50%", animation: "spin 0.7s linear infinite", display: "inline-block" }} />
+                  Doğrulanıyor...
+                </>
+              ) : "Giriş Yap →"}
             </button>
           </form>
-
-          {/* Alt Bilgi */}
-          <div className="mt-10 text-center">
-          </div>
         </div>
+
+        <p style={{ textAlign: "center", marginTop: "24px", fontSize: "11px", color: "rgba(255,255,255,0.12)" }}>
+          Sadece yetkili personel erişebilir
+        </p>
       </div>
+
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}}`}</style>
     </div>
   );
 }
