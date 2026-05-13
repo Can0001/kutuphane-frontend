@@ -12,7 +12,9 @@ interface Transaction {
   studentId: number;
   studentName: string;
   borrowedDate: string;
+  dueDate?: string;
   isReturned: boolean;
+  isOverdue: boolean;
   transactionId?: number;
 }
 
@@ -30,6 +32,10 @@ function BorrowModal({ books, students, onClose, onDone }: {
 }) {
   const [selectedBook, setSelectedBook] = useState("");
   const [selectedStudent, setSelectedStudent] = useState("");
+  const [dueDate, setDueDate] = useState(() => {
+    const d = new Date(); d.setDate(d.getDate() + 15);
+    return d.toISOString().split("T")[0];
+  });
   const [submitting, setSubmitting] = useState(false);
 
   const availableBooks = books.filter((b) => b.isAvailable);
@@ -41,15 +47,15 @@ function BorrowModal({ books, students, onClose, onDone }: {
     }
     setSubmitting(true);
     try {
-      const student = students.find((s) => s.id === parseInt(selectedStudent));
-      await axios.post(`${API}/Books/borrow/${selectedBook}`, {
+      await axios.post(`${API}/BookTransactions/assignbook`, {
+        bookId: parseInt(selectedBook),
         userId: parseInt(selectedStudent),
-        userName: `${student?.firstName} ${student?.lastName}`,
+        dueDate: new Date(dueDate).toISOString(),
       });
       Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Kitap ödünç verildi", showConfirmButton: false, timer: 1800, background: "#111827", color: "#fff" });
       onDone();
     } catch (err: any) {
-      Swal.fire({ icon: "error", title: "Hata", text: err.response?.data?.message || "İşlem başarısız.", background: "#111827", color: "#fff" });
+      Swal.fire({ icon: "error", title: "Hata", text: err.response?.data?.message || typeof err.response?.data === 'string' ? err.response.data : "İşlem başarısız.", background: "#111827", color: "#fff" });
     } finally { setSubmitting(false); }
   };
 
@@ -99,6 +105,19 @@ function BorrowModal({ books, students, onClose, onDone }: {
               ))}
             </select>
           </div>
+
+          {/* Due Date */}
+          <div>
+            <label style={{ display: "block", fontSize: "10px", fontWeight: 800, color: "rgba(255,255,255,0.28)", letterSpacing: "0.14em", textTransform: "uppercase", marginBottom: "6px" }}>Son Teslim Tarihi</label>
+            <input
+              type="date"
+              value={dueDate}
+              onChange={(e) => setDueDate(e.target.value)}
+              min={new Date().toISOString().split("T")[0]}
+              style={{ ...selectStyle, fontFamily: "monospace" }}
+            />
+            <div style={{ fontSize: "10px", color: "rgba(255,255,255,0.12)", marginTop: "4px" }}>Varsayılan: 15 gün sonra</div>
+          </div>
         </div>
 
         {/* Buttons */}
@@ -109,7 +128,7 @@ function BorrowModal({ books, students, onClose, onDone }: {
           </button>
         </div>
       </div>
-      <style>{`@keyframes spin{to{transform:rotate(360deg)}} select option{background:#111827}`}</style>
+      <style>{`@keyframes spin{to{transform:rotate(360deg)}} select option{background:#111827} input[type="date"]::-webkit-calendar-picker-indicator{filter:invert(0.7)}`}</style>
     </div>
   );
 }
@@ -142,11 +161,23 @@ export default function TransactionsPage() {
       
       setBooks(booksData);
       setStudents(studentsData);
-      setPendingRequests(pendingData);
 
-      // Build transaction list from BookTransactions (Status === 'Approved')
+      // Pending talepleri gerçek kitap/öğrenci isimleriyle eşleştir
+      const enrichedPending = pendingData.map((req: any) => {
+        const book = booksData.find((b: any) => b.id === req.bookId);
+        const user = usersData.find((u: any) => u.id === req.userId);
+        return {
+          ...req,
+          resolvedBookTitle: book ? book.title : (req.bookTitle || `Kitap #${req.bookId}`),
+          resolvedUserName: user ? `${user.firstName} ${user.lastName}` : (req.userName || `Kullanıcı #${req.userId}`),
+          resolvedDate: req.transactionDate || req.requestDate || null,
+        };
+      });
+      setPendingRequests(enrichedPending);
+
+      // Build transaction list from BookTransactions (Approved + Overdue)
       const txns: Transaction[] = allTxnsData
-        .filter((t: any) => t.status === "Approved")
+        .filter((t: any) => t.status === "Approved" || t.status === "Overdue")
         .map((t: any) => {
           const book = booksData.find(b => b.id === t.bookId);
           const user = usersData.find(u => u.id === t.userId);
@@ -157,7 +188,9 @@ export default function TransactionsPage() {
             studentId: t.userId,
             studentName: user ? `${user.firstName} ${user.lastName}` : `Kullanıcı #${t.userId}`,
             borrowedDate: t.transactionDate || t.requestDate || new Date().toISOString(),
+            dueDate: t.dueDate || undefined,
             isReturned: false,
+            isOverdue: t.status === "Overdue",
           };
         });
       setTransactions(txns);
@@ -182,7 +215,7 @@ export default function TransactionsPage() {
     });
     if (!c.isConfirmed) return;
     try {
-      await axios.post(`${API}/Books/return/${t.bookId}`);
+      await axios.post(`${API}/BookTransactions/return?id=${t.transactionId}`);
       fetchAll();
       Swal.fire({ toast: true, position: "top-end", icon: "info", title: "Kitap iade alındı", showConfirmButton: false, timer: 1800, background: "#111827", color: "#fff" });
     } catch { Swal.fire({ icon: "error", title: "Hata", background: "#111827", color: "#fff" }); }
@@ -211,10 +244,11 @@ export default function TransactionsPage() {
   };
 
   const activeCount = transactions.filter((t) => !t.isReturned).length;
-  const overdueCount = transactions.filter((t) => !t.isReturned && daysSince(t.borrowedDate) > 14).length;
+  const overdueCount = transactions.filter((t) => t.isOverdue).length;
 
   return (
     <div style={{ minHeight: "100%", background: "#080c18", display: "flex", flexDirection: "column" }}>
+      <style>{`@keyframes overdueBlink{0%,100%{opacity:1}50%{opacity:0.5}} .overdue-blink{animation:overdueBlink 2s ease-in-out infinite}`}</style>
       {showModal && <BorrowModal books={books} students={students} onClose={() => setShowModal(false)} onDone={() => { setShowModal(false); fetchAll(); }} />}
 
       {/* Header */}
@@ -266,18 +300,27 @@ export default function TransactionsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "rgba(245,158,11,0.1)", borderBottom: "1px solid rgba(245,158,11,0.15)" }}>
-                  {["Kitap", "Öğrenci", "Talep Tarihi", "İşlem"].map((h, i) => (
-                    <th key={h} style={{ padding: "13px 18px", textAlign: i === 3 ? "right" : "left", fontSize: "9px", color: "rgba(251,191,36,0.8)", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" }}>{h}</th>
+                  {["Kitap", "Öğrenci", "Talep Tarihi", "İstenen İade Tarihi", "İşlem"].map((h, i) => (
+                    <th key={h} style={{ padding: "13px 18px", textAlign: i === 4 ? "right" : "left", fontSize: "9px", color: "rgba(251,191,36,0.8)", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {pendingRequests.map((req, idx) => (
                   <tr key={req.id} style={{ borderBottom: "1px solid rgba(245,158,11,0.1)", background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.008)" }}>
-                    <td style={{ padding: "13px 18px", fontSize: "13px", fontWeight: 700, color: "#fde68a" }}>{req.bookTitle || `Kitap #${req.bookId}`}</td>
-                    <td style={{ padding: "13px 18px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>{req.userName || `Kullanıcı #${req.userId}`}</td>
+                    <td style={{ padding: "13px 18px", fontSize: "13px", fontWeight: 700, color: "#fde68a" }}>{req.resolvedBookTitle}</td>
+                    <td style={{ padding: "13px 18px", fontSize: "13px", color: "rgba(255,255,255,0.6)" }}>{req.resolvedUserName}</td>
                     <td style={{ padding: "13px 18px", fontSize: "12px", color: "rgba(255,255,255,0.4)", fontFamily: "monospace" }}>
-                      {req.requestDate ? new Date(req.requestDate).toLocaleDateString("tr-TR") : "Bilinmiyor"}
+                      {req.resolvedDate ? new Date(req.resolvedDate).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" }) : "—"}
+                    </td>
+                    <td style={{ padding: "13px 18px", fontSize: "12px", fontFamily: "monospace" }}>
+                      {req.dueDate ? (
+                        <span style={{ padding: "3px 10px", borderRadius: "8px", background: "rgba(99,102,241,0.08)", border: "1px solid rgba(99,102,241,0.18)", color: "#a5b4fc", fontSize: "11px", fontWeight: 700 }}>
+                          {new Date(req.dueDate).toLocaleDateString("tr-TR", { day: "2-digit", month: "long", year: "numeric" })}
+                        </span>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.15)" }}>—</span>
+                      )}
                     </td>
                     <td style={{ padding: "13px 18px", textAlign: "right" }}>
                       <div style={{ display: "flex", gap: "8px", justifyContent: "flex-end" }}>
@@ -310,21 +353,20 @@ export default function TransactionsPage() {
             <table style={{ width: "100%", borderCollapse: "collapse" }}>
               <thead>
                 <tr style={{ background: "rgba(255,255,255,0.025)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
-                  {["Kitap", "Öğrenci", "Ödünç Tarihi", "Süre", "Durum", "İşlem"].map((h, i) => (
-                    <th key={h} style={{ padding: "13px 18px", textAlign: i === 5 ? "right" : "left", fontSize: "9px", color: "rgba(255,255,255,0.22)", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" }}>{h}</th>
+                  {["Kitap", "Öğrenci", "Ödünç Tarihi", "Teslim Tarihi", "Süre", "Durum", "İşlem"].map((h, i) => (
+                    <th key={h} style={{ padding: "13px 18px", textAlign: i === 6 ? "right" : "left", fontSize: "9px", color: "rgba(255,255,255,0.22)", fontWeight: 800, letterSpacing: "0.15em", textTransform: "uppercase" }}>{h}</th>
                   ))}
                 </tr>
               </thead>
               <tbody>
                 {filtered.map((t, idx) => {
                   const days = daysSince(t.borrowedDate);
-                  const overdue = !t.isReturned && days > 14;
                   return (
-                    <tr key={`${t.bookId}-${idx}`} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.008)" }}>
+                    <tr key={`${t.bookId}-${idx}`} style={{ borderBottom: "1px solid rgba(255,255,255,0.04)", background: t.isOverdue ? "rgba(220,38,38,0.03)" : idx % 2 === 0 ? "transparent" : "rgba(255,255,255,0.008)" }}>
                       <td style={{ padding: "13px 18px" }}>
                         <div style={{ display: "flex", alignItems: "center", gap: "10px" }}>
-                          <div style={{ width: "30px", height: "30px", borderRadius: "8px", background: "rgba(99,102,241,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>📚</div>
-                          <span style={{ fontSize: "13px", fontWeight: 700, color: "#e2e8f0" }}>{t.bookTitle}</span>
+                          <div style={{ width: "30px", height: "30px", borderRadius: "8px", background: t.isOverdue ? "rgba(220,38,38,0.15)" : "rgba(99,102,241,0.15)", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "14px", flexShrink: 0 }}>{t.isOverdue ? "⚠️" : "📚"}</div>
+                          <span style={{ fontSize: "13px", fontWeight: 700, color: t.isOverdue ? "#fca5a5" : "#e2e8f0" }}>{t.bookTitle}</span>
                         </div>
                       </td>
                       <td style={{ padding: "13px 18px", fontSize: "13px", color: "rgba(255,255,255,0.45)" }}>{t.studentName}</td>
@@ -332,15 +374,34 @@ export default function TransactionsPage() {
                         {new Date(t.borrowedDate).toLocaleDateString("tr-TR")}
                       </td>
                       <td style={{ padding: "13px 18px" }}>
-                        <span style={{ padding: "4px 10px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, fontFamily: "monospace", background: overdue ? "rgba(239,68,68,0.1)" : "rgba(255,255,255,0.05)", color: overdue ? "#f87171" : "rgba(255,255,255,0.35)" }}>
+                        {t.dueDate ? (() => {
+                          const due = new Date(t.dueDate);
+                          const daysLeft = Math.ceil((due.getTime() - Date.now()) / 86400000);
+                          const isUrgent = daysLeft <= 2 && daysLeft >= 0;
+                          const isPast = daysLeft < 0;
+                          return (
+                            <span style={{
+                              padding: "4px 10px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, fontFamily: "monospace",
+                              background: isPast ? "rgba(220,38,38,0.12)" : isUrgent ? "rgba(245,158,11,0.12)" : "rgba(255,255,255,0.04)",
+                              color: isPast ? "#f87171" : isUrgent ? "#fbbf24" : "rgba(255,255,255,0.35)",
+                            }}>
+                              {due.toLocaleDateString("tr-TR")}
+                            </span>
+                          );
+                        })() : (
+                          <span style={{ fontSize: "11px", color: "rgba(255,255,255,0.15)" }}>—</span>
+                        )}
+                      </td>
+                      <td style={{ padding: "13px 18px" }}>
+                        <span style={{ padding: "4px 10px", borderRadius: "7px", fontSize: "11px", fontWeight: 700, fontFamily: "monospace", background: t.isOverdue ? "rgba(220,38,38,0.15)" : "rgba(255,255,255,0.05)", color: t.isOverdue ? "#f87171" : "rgba(255,255,255,0.35)" }}>
                           {days} gün
                         </span>
                       </td>
                       <td style={{ padding: "13px 18px" }}>
                         {t.isReturned ? (
                           <span style={{ padding: "4px 11px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.25)", color: "#34d399" }}>● İade Edildi</span>
-                        ) : overdue ? (
-                          <span style={{ padding: "4px 11px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "rgba(239,68,68,0.1)", border: "1px solid rgba(239,68,68,0.25)", color: "#f87171" }}>● Gecikmiş</span>
+                        ) : t.isOverdue ? (
+                          <span className="overdue-blink" style={{ padding: "4px 11px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "rgba(220,38,38,0.15)", border: "1px solid rgba(220,38,38,0.35)", color: "#f87171" }}>⚠ Süresi Doldu</span>
                         ) : (
                           <span style={{ padding: "4px 11px", borderRadius: "20px", fontSize: "10px", fontWeight: 800, background: "rgba(245,158,11,0.1)", border: "1px solid rgba(245,158,11,0.25)", color: "#fbbf24" }}>● Ödünçte</span>
                         )}

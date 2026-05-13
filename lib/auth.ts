@@ -45,6 +45,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/add": ["Admin", "Librarian", "Assistant"],
   "/dashboard/edit": ["Admin", "Librarian", "Assistant"],
   "/dashboard/transactions": ["Admin", "Librarian", "Assistant"],
+  "/dashboard/my-borrows": ["Student"],
 };
 
 // ─── JWT decode (imza doğrulaması yapılmaz — bu sadece UX amaçlıdır) ─────────

@@ -13,7 +13,7 @@ const NAV_ITEMS = [
     label: "Gösterge Paneli",
     icon: "◈",
     exact: true,
-    roles: ["Admin", "Librarian", "Assistant"] as UserRole[],
+    roles: ["Admin", "Librarian", "Assistant", "Student"] as UserRole[],
   },
   {
     href: "/dashboard/books",
@@ -22,6 +22,12 @@ const NAV_ITEMS = [
     roles: ["Admin", "Librarian", "Assistant", "Student"] as UserRole[],
     // Assistant için read-only — ayrı bir prop ekleyebiliriz
     readOnlyFor: ["Assistant"] as UserRole[],
+  },
+  {
+    href: "/dashboard/my-borrows",
+    label: "Ödünç Aldıklarım",
+    icon: "📋",
+    roles: ["Student"] as UserRole[],
   },
   {
     href: "/dashboard/users",
@@ -177,7 +183,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
             <div style={{ fontSize: "9px", color: "rgba(165,180,252,0.4)", fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", marginBottom: "3px" }}>Erişim Seviyesi</div>
             <div style={{ fontSize: "11px", color: "rgba(165,180,252,0.65)", fontWeight: 600 }}>
               {role === "Student"
-                ? "Salt okunur — Sadece kitaplar"
+                ? "Kitaplar ve ödünç talepleriniz"
                 : role === "Librarian"
                 ? "Personeller sayfası gizli"
                 : "Kısıtlı erişim — Sadece okuma"}

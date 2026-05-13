@@ -11,6 +11,7 @@ const ROUTE_PERMISSIONS: [string, UserRole[]][] = [
   ["/dashboard/add", ["Admin", "Librarian", "Assistant"]],
   ["/dashboard/edit", ["Admin", "Librarian", "Assistant"]],
   ["/dashboard/transactions", ["Admin", "Librarian", "Assistant"]],
+  ["/dashboard/my-borrows", ["Student"]],
 ];
 
 // ─── JWT payload decode (Edge runtime'da atob mevcuttur) ─────────────────────
@@ -83,9 +84,7 @@ export function middleware(request: NextRequest) {
   const role = extractRoleFromPayload(payload);
 
   // Öğrenciler anasayfayı görmesin, direkt kitaplara gitsin
-  if (pathname === "/dashboard" && role === "Student") {
-    return NextResponse.redirect(new URL("/dashboard/books", request.url));
-  }
+  // Öğrenciler artık kendi dashboard'larını görecek — yönlendirme kaldırıldı
 
   for (const [route, allowedRoles] of ROUTE_PERMISSIONS) {
     if (pathname.startsWith(route)) {

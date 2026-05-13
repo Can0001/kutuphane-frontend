@@ -82,7 +82,7 @@ export default function EditBook() {
           Geri Dön
         </button>
 
-        <div className="bg-[#161b27] border border-white/5 rounded-3xl p-10">
+        <div className="bg-[#161b27] border border-white/5 rounded-3xl p-8 sm:p-12">
           {/* Başlık */}
           <div className="mb-10 pb-8 border-b border-white/5">
             <div className="flex items-center gap-3 mb-2">
@@ -97,13 +97,13 @@ export default function EditBook() {
           </div>
 
           <form onSubmit={handleUpdate} className="space-y-8">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-12">
               {/* Kapak Resmi */}
               <div className="flex flex-col">
-                <label className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-3">
+                <label className="text-xs font-bold uppercase text-white/40 tracking-widest mb-3">
                   Kapak Görseli
                 </label>
-                <label className="relative flex-1 min-h-72 border-2 border-dashed border-white/10 rounded-2xl overflow-hidden cursor-pointer group hover:border-indigo-500/50 transition-all">
+                <label className="relative flex-1 min-h-72 border border-white/10 bg-white/5 rounded-2xl overflow-hidden cursor-pointer group hover:bg-white/10 hover:border-indigo-500/50 transition-all duration-300">
                   {previewUrl ? (
                     <>
                       <img src={previewUrl} className="absolute inset-0 w-full h-full object-cover" alt="Kapak" />
@@ -132,13 +132,13 @@ export default function EditBook() {
                   { key: "pageCount", label: "Sayfa Sayısı", type: "number" },
                 ].map((field) => (
                   <div key={field.key}>
-                    <label className="text-[10px] font-black uppercase text-white/30 tracking-widest mb-2 block">
+                    <label className="text-xs font-bold uppercase text-white/40 tracking-widest mb-3 block">
                       {field.label}
                     </label>
                     <input
                       type={field.type}
                       required
-                      className="w-full bg-white/5 border border-white/10 text-white placeholder-white/15 rounded-xl px-4 py-3.5 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/8 transition-all"
+                      className="w-full bg-white/5 border border-white/10 text-white placeholder-white/15 rounded-xl px-5 py-4 text-sm outline-none focus:border-indigo-500/60 focus:bg-white/10 transition-all duration-300"
                       value={(formData as any)[field.key]}
                       onChange={(e) => setFormData({ ...formData, [field.key]: e.target.value })}
                     />
@@ -148,18 +148,18 @@ export default function EditBook() {
             </div>
 
             {/* Butonlar */}
-            <div className="flex gap-4 pt-4 border-t border-white/5">
+            <div className="flex justify-end gap-4 pt-8 border-t border-white/5 mt-8">
               <button
                 type="button"
                 onClick={() => router.back()}
-                className="flex-1 py-4 rounded-2xl bg-white/5 border border-white/10 text-white/40 hover:text-white/70 hover:bg-white/10 transition-all text-xs font-black uppercase tracking-widest"
+                className="px-8 py-4 rounded-2xl border border-white/10 text-white/50 hover:text-white/90 hover:bg-white/5 transition-all text-xs font-bold uppercase tracking-widest"
               >
                 Vazgeç
               </button>
               <button
                 type="submit"
                 disabled={isSubmitting}
-                className="flex-[2] py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-500/30 transition-all active:scale-95 disabled:opacity-50"
+                className="px-8 py-4 rounded-2xl bg-indigo-600 hover:bg-indigo-500 text-white font-bold text-xs uppercase tracking-widest transition-all active:scale-95 disabled:opacity-50"
               >
                 {isSubmitting ? (
                   <span className="flex items-center justify-center gap-2">

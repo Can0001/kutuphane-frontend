@@ -188,7 +188,7 @@ export default function UsersPage() {
     setSubmitting(true);
     try {
       if (editTarget) {
-        await axios.put(`${API}/Users/update`, {
+        await axios.post(`${API}/Users/update`, {
           id: editTarget.id,
           firstName: form.firstName,
           lastName: form.lastName,
