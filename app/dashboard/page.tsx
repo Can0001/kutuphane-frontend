@@ -46,7 +46,7 @@ interface BookInfo {
 }
 
 function StudentDashboard() {
-  const [stats, setStats] = useState({ approved: 0, pending: 0, returned: 0, overdue: 0 });
+  const [stats, setStats] = useState({ approved: 0, pending: 0, returned: 0, overdue: 0, trustScore: 0, penaltyScore: 0 });
   const [activeBooks, setActiveBooks] = useState<{
     id: number;
     bookTitle: string;
@@ -64,12 +64,18 @@ function StudentDashboard() {
     const fetchData = async () => {
       setLoading(true);
       try {
-        const [txnRes, booksRes] = await Promise.allSettled([
+        const [txnRes, booksRes, usersRes] = await Promise.allSettled([
           axios.get(`${API}/BookTransactions/getbyuser?userId=${userId}`),
           axios.get(`${API}/Books/getall`),
+          axios.get(`${API}/Users/getall`),
         ]);
         const txns: any[] = txnRes.status === "fulfilled" ? txnRes.value.data : [];
         const books: BookInfo[] = booksRes.status === "fulfilled" ? booksRes.value.data : [];
+        const users: any[] = usersRes.status === "fulfilled" ? usersRes.value.data : [];
+
+        const me = users.find(u => String(u.id) === String(userId));
+        const trustScore = me?.trustScore || 0;
+        const penaltyScore = me?.penaltyScore || 0;
 
         const bookMap = new Map<number, BookInfo>();
         books.forEach((b) => bookMap.set(b.id, b));
@@ -84,6 +90,8 @@ function StudentDashboard() {
           pending: pending.length,
           returned: returned.length,
           overdue: overdue.length,
+          trustScore,
+          penaltyScore,
         });
 
         const activeTxns = [...approved, ...overdue];
@@ -115,9 +123,50 @@ function StudentDashboard() {
       <div style={{ marginBottom: "32px" }}>
         <div style={{ fontSize: "11px", color: "rgba(255,255,255,0.2)", fontWeight: 700, letterSpacing: "0.3em", textTransform: "uppercase", marginBottom: "6px" }}>Hoş Geldin</div>
         <h1 style={{ fontSize: "32px", fontWeight: 900, letterSpacing: "-0.02em", background: "linear-gradient(90deg, #fff, rgba(255,255,255,0.5))", WebkitBackgroundClip: "text", WebkitTextFillColor: "transparent", margin: 0 }}>
-          {userName || "Öğrenci"} 👋
+          {userName || "Öğrenci"} <span style={{ fontFamily: '"Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji"', WebkitTextFillColor: "initial" }}>👋</span>
         </h1>
       </div>
+
+      {/* Gamification Stats */}
+      {(() => {
+        let maxLimit = 5;
+        let tierName = "Standart Okur";
+        let tierColor = "#94a3b8";
+        let tierBg = "rgba(148,163,184,0.15)";
+        
+        if (stats.trustScore >= 100) {
+          maxLimit = 10;
+          tierName = "VIP Okur";
+          tierColor = "#fbbf24";
+          tierBg = "rgba(251,191,36,0.15)";
+        } else if (stats.trustScore >= 50) {
+          maxLimit = 7;
+          tierName = "Güvenilir Okur";
+          tierColor = "#38bdf8";
+          tierBg = "rgba(56,189,248,0.15)";
+        }
+
+        const activeBooksCount = stats.approved + stats.overdue;
+
+        return (
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "16px", marginBottom: "16px" }}>
+            <div style={{ position: "relative" }}>
+              <StatCard label="Güven Puanım" value={loading ? "—" : stats.trustScore} icon="🏆" color="#10b981" bg="rgba(16,185,129,0.06)" border="rgba(16,185,129,0.2)" />
+              {!loading && (
+                <div style={{ position: "absolute", top: "16px", right: "20px", display: "flex", flexDirection: "column", alignItems: "flex-end", gap: "8px" }}>
+                  <span style={{ padding: "4px 10px", borderRadius: "12px", fontSize: "10px", fontWeight: 800, color: tierColor, background: tierBg, border: `1px solid ${tierColor}40`, textTransform: "uppercase", letterSpacing: "0.05em" }}>
+                    {tierName}
+                  </span>
+                  <span style={{ fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)" }}>
+                    {activeBooksCount} / {maxLimit} Kitap Kullanımda
+                  </span>
+                </div>
+              )}
+            </div>
+            <StatCard label="Ceza Puanım" value={loading ? "—" : stats.penaltyScore} icon="⚠️" color="#f97316" bg="rgba(249,115,22,0.06)" border="rgba(249,115,22,0.2)" />
+          </div>
+        );
+      })()}
 
       {/* Stats */}
       <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(190px, 1fr))", gap: "16px", marginBottom: "32px" }}>

@@ -14,6 +14,8 @@ export interface User {
   studentNumber?: string;
   department?: string;
   phoneNumber?: string;
+  trustScore?: number;
+  penaltyScore?: number;
 }
 
 // ─── JWT payload tipi ─────────────────────────────────────────────────────────
@@ -45,6 +47,7 @@ export const ROUTE_PERMISSIONS: Record<string, UserRole[]> = {
   "/dashboard/add": ["Admin", "Librarian", "Assistant"],
   "/dashboard/edit": ["Admin", "Librarian", "Assistant"],
   "/dashboard/transactions": ["Admin", "Librarian", "Assistant"],
+  "/dashboard/reports": ["Admin", "Librarian"],
   "/dashboard/my-borrows": ["Student"],
 };
 

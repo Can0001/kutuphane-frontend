@@ -8,12 +8,13 @@ import { useAuth } from "@/contexts/AuthContext";
 
 const API = "https://localhost:7069/api";
 
-const ROLES = ["Admin", "Librarian", "Assistant", "Student"];
+const ROLES = ["Admin", "Personel", "Student"];
 const ROLE_STYLE: Record<string, { bg: string; border: string; color: string }> = {
   Admin:     { bg: "rgba(139,92,246,0.12)", border: "rgba(139,92,246,0.28)", color: "#c4b5fd" },
-  Librarian: { bg: "rgba(59,130,246,0.1)",  border: "rgba(59,130,246,0.25)", color: "#93c5fd" },
-  Assistant: { bg: "rgba(16,185,129,0.1)",  border: "rgba(16,185,129,0.25)", color: "#6ee7b7" },
+  Personel:  { bg: "rgba(59,130,246,0.1)",  border: "rgba(59,130,246,0.25)", color: "#93c5fd" },
   Student:   { bg: "rgba(245,158,11,0.1)",  border: "rgba(245,158,11,0.25)", color: "#fcd34d" },
+  // Eski verilerle geriye dönük uyumluluk için:
+  Librarian: { bg: "rgba(59,130,246,0.1)",  border: "rgba(59,130,246,0.25)", color: "#93c5fd" },
 };
 
 const EMPTY: Record<string, string> = {
@@ -64,7 +65,7 @@ function Modal({
         {/* Role Selector */}
         <div style={{ marginBottom: "24px" }}>
           <label style={{ display: "block", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.08em", marginBottom: "10px" }}>Rol Seçimi</label>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px" }}>
+          <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: "10px" }}>
             {ROLES.map((r) => {
               const active = form.role === r;
               const st = ROLE_STYLE[r] || ROLE_STYLE.Student;
@@ -254,7 +255,13 @@ export default function UsersPage() {
   };
 
   const filtered = users.filter((u) => {
-    if (filterRole !== "All" && u.role !== filterRole) return false;
+    if (filterRole !== "All") {
+      if (filterRole === "Personel" && u.role === "Librarian") {
+        // Personel seçildiğinde eski "Librarian" kayıtlarını da göster
+      } else if (u.role !== filterRole) {
+        return false;
+      }
+    }
     const q = search.toLowerCase();
     return (
       u.firstName.toLowerCase().includes(q) ||
@@ -297,9 +304,8 @@ export default function UsersPage() {
           style={{ width: "180px", padding: "16px 20px", borderRadius: "16px", background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", color: "rgba(255,255,255,0.7)", fontSize: "14px", outline: "none", cursor: "pointer", appearance: "none" }}
         >
           <option value="All">Tüm Roller</option>
-          <option value="Admin">Süper Admin</option>
-          <option value="Librarian">Kütüphaneci</option>
-          <option value="Assistant">Asistan</option>
+          <option value="Admin">Admin</option>
+          <option value="Personel">Personel</option>
           <option value="Student">Öğrenci</option>
         </select>
       </div>
@@ -312,6 +318,8 @@ export default function UsersPage() {
               <tr style={{ background: "rgba(255,255,255,0.02)", borderBottom: "1px solid rgba(255,255,255,0.05)" }}>
                 <th style={{ padding: "20px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Kullanıcı</th>
                 <th style={{ padding: "20px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Rol & Detay</th>
+                <th style={{ padding: "20px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Güven P.</th>
+                <th style={{ padding: "20px", textAlign: "center", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Ceza P.</th>
                 <th style={{ padding: "20px", textAlign: "left", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>Durum</th>
                 <th style={{ padding: "20px", textAlign: "right", fontSize: "11px", fontWeight: 700, color: "rgba(255,255,255,0.4)", textTransform: "uppercase", letterSpacing: "0.1em" }}>İşlemler</th>
               </tr>
@@ -335,7 +343,7 @@ export default function UsersPage() {
                     <td style={{ padding: "20px" }}>
                       <div style={{ display: "flex", flexDirection: "column", gap: "6px", alignItems: "flex-start" }}>
                         <span style={{ display: "inline-block", padding: "4px 10px", borderRadius: "8px", background: rStyle.bg, border: `1px solid ${rStyle.border}`, color: rStyle.color, fontSize: "11px", fontWeight: 600 }}>
-                          {u.role === "Student" ? "Öğrenci" : u.role}
+                          {u.role === "Student" ? "Öğrenci" : (u.role === "Librarian" ? "Personel" : u.role)}
                         </span>
                         {u.role === "Student" && (
                           <div style={{ fontSize: "12px", color: "rgba(255,255,255,0.5)" }}>
@@ -343,6 +351,31 @@ export default function UsersPage() {
                           </div>
                         )}
                       </div>
+                    </td>
+                    <td style={{ padding: "20px", textAlign: "center" }}>
+                      {u.role === "Student" ? (
+                        <div style={{ display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "8px", background: "rgba(16,185,129,0.1)", border: "1px solid rgba(16,185,129,0.2)" }}>
+                          <span style={{ fontSize: "12px" }}>🏆</span>
+                          <span style={{ fontSize: "12px", fontWeight: 700, color: "#34d399" }}>{u.trustScore || 0}</span>
+                        </div>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>
+                      )}
+                    </td>
+                    <td style={{ padding: "20px", textAlign: "center", background: (u.penaltyScore && u.penaltyScore >= 50) ? "rgba(239,68,68,0.04)" : "transparent" }}>
+                      {u.role === "Student" ? (
+                        <div style={{ 
+                          display: "inline-flex", alignItems: "center", gap: "6px", padding: "4px 10px", borderRadius: "8px", 
+                          background: (u.penaltyScore && u.penaltyScore >= 50) ? "rgba(239,68,68,0.25)" : "rgba(249,115,22,0.1)", 
+                          border: (u.penaltyScore && u.penaltyScore >= 50) ? "1px solid rgba(239,68,68,0.5)" : "1px solid rgba(249,115,22,0.2)",
+                          boxShadow: (u.penaltyScore && u.penaltyScore >= 50) ? "0 0 12px rgba(239,68,68,0.3)" : "none"
+                        }}>
+                          <span style={{ fontSize: "12px" }}>⚠️</span>
+                          <span style={{ fontSize: "12px", fontWeight: 800, color: (u.penaltyScore && u.penaltyScore >= 50) ? "#fca5a5" : "#fb923c" }}>{u.penaltyScore || 0}</span>
+                        </div>
+                      ) : (
+                        <span style={{ color: "rgba(255,255,255,0.2)" }}>—</span>
+                      )}
                     </td>
                     <td style={{ padding: "20px" }}>
                       <div style={{ display: "inline-flex", alignItems: "center", gap: "8px", padding: "6px 12px", borderRadius: "20px", background: u.status ? "rgba(16,185,129,0.1)" : "rgba(239,68,68,0.1)", border: `1px solid ${u.status ? "rgba(16,185,129,0.2)" : "rgba(239,68,68,0.2)"}` }}>
@@ -365,7 +398,7 @@ export default function UsersPage() {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={4} style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.4)" }}>Kullanıcı bulunamadı.</td>
+                  <td colSpan={6} style={{ padding: "40px", textAlign: "center", color: "rgba(255,255,255,0.4)" }}>Kullanıcı bulunamadı.</td>
                 </tr>
               )}
             </tbody>

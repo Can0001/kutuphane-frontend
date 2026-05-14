@@ -15,6 +15,7 @@ interface Book {
   isbn: string;
   pageCount: number;
   isAvailable: boolean;
+  status: boolean; // true = Aktif, false = Pasif
   borrowedBy?: string;
   borrowerId?: number;
   borrowedDate?: string;
@@ -25,6 +26,9 @@ export default function BooksPage() {
   const [books, setBooks] = useState<Book[]>([]);
   const [approvedBookIds, setApprovedBookIds] = useState<Set<number>>(new Set());
   const [myBookStatus, setMyBookStatus] = useState<Map<number, string>>(new Map());
+  const [currentUserPenalty, setCurrentUserPenalty] = useState<number>(0);
+  const [currentUserTrustScore, setCurrentUserTrustScore] = useState<number>(0);
+  const [currentUserActiveBooks, setCurrentUserActiveBooks] = useState<number>(0);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState("all");
   const [loading, setLoading] = useState(true);
@@ -33,13 +37,29 @@ export default function BooksPage() {
 
   const fetchBooks = async () => {
     try {
-      const [booksRes, txnsRes] = await Promise.allSettled([
+      const [booksRes, txnsRes, usersRes] = await Promise.allSettled([
         axios.get(`${API}/Books/getall`),
         axios.get(`${API}/BookTransactions/getall`),
+        axios.get(`${API}/Users/getall`),
       ]);
 
       const booksData: Book[] = booksRes.status === "fulfilled" ? booksRes.value.data : [];
       const txnsData: any[] = txnsRes.status === "fulfilled" ? txnsRes.value.data : [];
+      const usersData: any[] = usersRes.status === "fulfilled" ? usersRes.value.data : [];
+
+      if (currentUserId) {
+        const me = usersData.find((u: any) => String(u.id) === String(currentUserId));
+        if (me) {
+          setCurrentUserPenalty(me.penaltyScore || 0);
+          setCurrentUserTrustScore(me.trustScore || 0);
+        }
+
+        const activeCount = txnsData.filter((t: any) => 
+          String(t.userId) === String(currentUserId) && 
+          (t.status === "Approved" || t.status === "Overdue")
+        ).length;
+        setCurrentUserActiveBooks(activeCount);
+      }
 
       // Sadece Status === "Approved" veya "Overdue" olan kayıtlar kitabın ödünçte olduğunu gösterir.
       // Returned veya Rejected kayıtlar kitabı "ödünçte" YAPMAZ — rafa dönmüştür.
@@ -184,6 +204,31 @@ export default function BooksPage() {
     } finally { setRequestSubmitting(false); }
   };
 
+  const handleChangeStatus = async (book: Book) => {
+    const action = book.status ? "pasif" : "aktif";
+    const c = await Swal.fire({
+      title: `Kitabı ${action} yap?`,
+      text: `"${book.title}" kitabı ${action} yapılacak.`,
+      icon: "question",
+      showCancelButton: true,
+      confirmButtonColor: book.status ? "#ef4444" : "#10b981",
+      confirmButtonText: book.status ? "⏻ Pasif Yap" : "⏻ Aktif Yap",
+      cancelButtonText: "Vazgeç",
+      background: "#111827", color: "#fff",
+    });
+    if (!c.isConfirmed) return;
+    try {
+      await axios.post(`${API}/Books/changestatus?id=${book.id}`);
+      fetchBooks();
+      Swal.fire({ toast: true, position: "top-end", icon: "success", title: `Kitap ${action} yapıldı`, showConfirmButton: false, timer: 1800, background: "#111827", color: "#fff" });
+    } catch (err: any) {
+      const msg = typeof err.response?.data === "string"
+        ? err.response.data
+        : err.response?.data?.message || `Kitap ${action} yapılamadı.`;
+      Swal.fire({ icon: "error", title: "İşlem Başarısız", text: msg, background: "#111827", color: "#fff" });
+    }
+  };
+
   const handleDelete = async (id: number, title: string) => {
     const c = await Swal.fire({
       title: "Emin misiniz?", text: `"${title}" kalıcı olarak silinecek.`, icon: "warning",
@@ -196,7 +241,10 @@ export default function BooksPage() {
         fetchBooks();
         Swal.fire({ toast: true, position: "top-end", icon: "success", title: "Kitap silindi", showConfirmButton: false, timer: 1500, background: "#111827", color: "#fff" });
       } catch (err: any) {
-        Swal.fire({ icon: "error", title: "Silinemedi", text: err.response?.data?.message, background: "#111827", color: "#fff" });
+        const msg = typeof err.response?.data === "string"
+          ? err.response.data
+          : err.response?.data?.message || "Bu kitap silinemedi.";
+        Swal.fire({ icon: "error", title: "Silinemedi", text: msg, background: "#111827", color: "#fff" });
       }
     }
   };
@@ -261,12 +309,15 @@ export default function BooksPage() {
           <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(270px, 1fr))", gap: "20px" }}>
             {filtered.map((book) => {
               const isReallyAvailable = book.isAvailable;
-              const myStatus = myBookStatus.get(book.id); // undefined | 'Pending' | 'Approved' | 'Overdue'
+              const isActive = book.status !== false; // undefined/true → aktif
+              const myStatus = myBookStatus.get(book.id);
 
               return (
               <div key={book.id} className="book-card" style={{
-                background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)",
-                borderRadius: "20px", overflow: "hidden", transition: "all 0.3s", display: "flex", flexDirection: "column"
+                background: "rgba(255,255,255,0.02)",
+                border: isActive ? "1px solid rgba(255,255,255,0.06)" : "1px solid rgba(239,68,68,0.12)",
+                borderRadius: "20px", overflow: "hidden", transition: "all 0.3s", display: "flex", flexDirection: "column",
+                opacity: (!isActive && currentUserRole !== "Student") ? 0.75 : 1,
               }}>
                 {/* Cover */}
                 <div style={{ height: "180px", background: "linear-gradient(135deg, #1e2435, #151b2c)", position: "relative", overflow: "hidden" }}>
@@ -277,14 +328,36 @@ export default function BooksPage() {
                       {book.title[0]}
                     </div>
                   )}
+                  {/* Pasif overlay — sadece öğrenci görünümünde */}
+                  {!isActive && currentUserRole === "Student" && (
+                    <div style={{
+                      position: "absolute", inset: 0,
+                      background: "rgba(10,14,26,0.78)", backdropFilter: "blur(3px)",
+                      display: "flex", alignItems: "center", justifyContent: "center", flexDirection: "column", gap: "6px",
+                    }}>
+                      <span style={{ fontSize: "26px" }}>🚫</span>
+                      <span style={{ fontSize: "11px", fontWeight: 800, color: "rgba(248,113,113,0.9)", letterSpacing: "0.1em", textTransform: "uppercase" }}>Kullanım Dışı</span>
+                    </div>
+                  )}
                   <span style={{
                     position: "absolute", top: "12px", left: "12px",
                     padding: "5px 12px", borderRadius: "20px", fontSize: "10px", fontWeight: 800,
                     letterSpacing: "0.08em", backdropFilter: "blur(8px)",
-                    background: isReallyAvailable ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
-                    border: isReallyAvailable ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(239,68,68,0.3)",
-                    color: isReallyAvailable ? "#34d399" : "#f87171"
-                  }}>{isReallyAvailable ? "● Mevcut" : "● Ödünçte"}</span>
+                    background: !isActive ? "rgba(107,114,128,0.2)" : isReallyAvailable ? "rgba(16,185,129,0.15)" : "rgba(239,68,68,0.15)",
+                    border: !isActive ? "1px solid rgba(107,114,128,0.3)" : isReallyAvailable ? "1px solid rgba(16,185,129,0.3)" : "1px solid rgba(239,68,68,0.3)",
+                    color: !isActive ? "#9ca3af" : isReallyAvailable ? "#34d399" : "#f87171"
+                  }}>{!isActive ? "⏻ Pasif" : isReallyAvailable ? "● Mevcut" : "● Ödünçte"}</span>
+                  {/* Admin status badge — sağ üst */}
+                  {currentUserRole !== "Student" && (
+                    <span style={{
+                      position: "absolute", top: "12px", right: "12px",
+                      padding: "5px 10px", borderRadius: "20px", fontSize: "10px", fontWeight: 800,
+                      backdropFilter: "blur(8px)",
+                      background: isActive ? "rgba(16,185,129,0.12)" : "rgba(239,68,68,0.12)",
+                      border: isActive ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(239,68,68,0.25)",
+                      color: isActive ? "#34d399" : "#f87171",
+                    }}>⏻ {isActive ? "Aktif" : "Pasif"}</span>
+                  )}
                 </div>
 
                 {/* Info */}
@@ -319,53 +392,144 @@ export default function BooksPage() {
 
                   {currentUserRole !== "Student" && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      <button onClick={() => isReallyAvailable ? handleOpenBorrowModal(book.id) : handleReturn(book.id)} style={{
-                        flex: 1, padding: "10px", borderRadius: "12px", border: "none", cursor: "pointer",
-                        background: isReallyAvailable ? "linear-gradient(135deg,#6366f1,#7c3aed)" : "rgba(255,255,255,0.06)",
-                        color: isReallyAvailable ? "#fff" : "rgba(255,255,255,0.4)",
-                        fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", transition: "all 0.2s"
-                      }}>{isReallyAvailable ? "Ödünç Ver" : "İade Al"}</button>
-                      <button onClick={() => router.push(`/dashboard/edit/${book.id}`)} style={{ width: "40px", height: "40px", borderRadius: "12px", border: "1px solid rgba(255,255,255,0.07)", background: "rgba(255,255,255,0.04)", cursor: "pointer", fontSize: "14px", transition: "all 0.2s" }}>✏️</button>
-                      <button onClick={() => handleDelete(book.id, book.title)} style={{ width: "40px", height: "40px", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.1)", background: "rgba(239,68,68,0.05)", cursor: "pointer", fontSize: "14px", transition: "all 0.2s" }}>🗑️</button>
+                      {/* Ödünç Ver / İade Al — pasif kitapta disabled */}
+                      <button
+                        disabled={!isActive}
+                        onClick={() => isActive ? (isReallyAvailable ? handleOpenBorrowModal(book.id) : handleReturn(book.id)) : undefined}
+                        style={{
+                          flex: 1, padding: "10px", borderRadius: "12px", border: "none",
+                          cursor: !isActive ? "not-allowed" : "pointer",
+                          background: !isActive
+                            ? "rgba(255,255,255,0.04)"
+                            : isReallyAvailable
+                              ? "linear-gradient(135deg,#6366f1,#7c3aed)"
+                              : "rgba(255,255,255,0.06)",
+                          color: !isActive ? "rgba(255,255,255,0.2)" : isReallyAvailable ? "#fff" : "rgba(255,255,255,0.4)",
+                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em",
+                          opacity: !isActive ? 0.45 : 1, transition: "all 0.2s",
+                        }}
+                      >{isReallyAvailable ? "Ödünç Ver" : "İade Al"}</button>
+
+                      {/* Aktif/Pasif toggle */}
+                      <button
+                        title={isActive ? "Pasif Yap" : "Aktif Yap"}
+                        onClick={() => handleChangeStatus(book)}
+                        style={{
+                          width: "40px", height: "40px", borderRadius: "12px", cursor: "pointer", fontSize: "16px",
+                          transition: "all 0.2s", display: "flex", alignItems: "center", justifyContent: "center",
+                          border: isActive ? "1px solid rgba(16,185,129,0.25)" : "1px solid rgba(239,68,68,0.25)",
+                          background: isActive ? "rgba(16,185,129,0.08)" : "rgba(239,68,68,0.08)",
+                          color: isActive ? "#34d399" : "#f87171",
+                        }}
+                      >⏻</button>
+
+                      {/* Düzenle — pasif kitapta disabled */}
+                      <button
+                        disabled={!isActive}
+                        onClick={() => isActive ? router.push(`/dashboard/edit/${book.id}`) : undefined}
+                        title={!isActive ? "Pasif kitap düzenlenemez" : "Düzenle"}
+                        style={{
+                          width: "40px", height: "40px", borderRadius: "12px",
+                          border: "1px solid rgba(255,255,255,0.07)",
+                          background: "rgba(255,255,255,0.04)",
+                          cursor: !isActive ? "not-allowed" : "pointer",
+                          fontSize: "14px", transition: "all 0.2s",
+                          opacity: !isActive ? 0.35 : 1,
+                        }}
+                      >✏️</button>
+
+                      {/* Sil — yalnızca Admin rolünde render edilir */}
+                      {currentUserRole === "Admin" && (
+                        <button
+                          disabled={!isActive}
+                          onClick={() => isActive ? handleDelete(book.id, book.title) : undefined}
+                          title={!isActive ? "Pasif kitap silinemez" : "Sil"}
+                          style={{
+                            width: "40px", height: "40px", borderRadius: "12px",
+                            border: "1px solid rgba(239,68,68,0.1)",
+                            background: "rgba(239,68,68,0.05)",
+                            cursor: !isActive ? "not-allowed" : "pointer",
+                            fontSize: "14px", transition: "all 0.2s",
+                            opacity: !isActive ? 0.35 : 1,
+                          }}
+                        >🗑️</button>
+                      )}
                     </div>
                   )}
 
                   {currentUserRole === "Student" && (
                     <div style={{ display: "flex", gap: "8px" }}>
-                      {myStatus === "Pending" ? (
+                      {!isActive ? (
+                        /* Pasif kitap — buton hiç gösterilmez, sadece bilgi mesajı */
+                        <div style={{
+                          flex: 1, padding: "10px", borderRadius: "12px",
+                          border: "1px solid rgba(107,114,128,0.15)",
+                          background: "rgba(107,114,128,0.05)",
+                          color: "rgba(156,163,175,0.6)",
+                          fontSize: "11px", fontWeight: 800, textAlign: "center",
+                        }}>🚫 Kullanım Dışı</div>
+                      ) : myStatus === "Pending" ? (
                         <button disabled style={{
                           flex: 1, padding: "10px", borderRadius: "12px", border: "1px solid rgba(245,158,11,0.2)",
-                          cursor: "not-allowed",
-                          background: "rgba(245,158,11,0.08)",
+                          cursor: "not-allowed", background: "rgba(245,158,11,0.08)",
                           color: "rgba(251,191,36,0.6)",
-                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", transition: "all 0.2s",
-                          opacity: 0.7,
+                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", opacity: 0.7,
                         }}>⏳ Onay Bekliyor</button>
                       ) : myStatus === "Approved" || myStatus === "Overdue" ? (
                         <button disabled style={{
                           flex: 1, padding: "10px", borderRadius: "12px", border: "1px solid rgba(16,185,129,0.2)",
-                          cursor: "not-allowed",
-                          background: "rgba(16,185,129,0.08)",
+                          cursor: "not-allowed", background: "rgba(16,185,129,0.08)",
                           color: "rgba(52,211,153,0.6)",
-                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", transition: "all 0.2s",
-                          opacity: 0.7,
+                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", opacity: 0.7,
                         }}>📖 Şu An Sizde</button>
                       ) : isReallyAvailable ? (
-                        <button onClick={() => handleOpenRequestModal(book)} style={{
-                          flex: 1, padding: "10px", borderRadius: "12px", border: "none", cursor: "pointer",
-                          background: "linear-gradient(135deg,#10b981,#059669)",
-                          color: "#fff",
-                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", transition: "all 0.2s",
-                          boxShadow: "0 8px 16px rgba(16,185,129,0.2)"
-                        }}>Ödünç İste</button>
+                        <button 
+                          onClick={() => {
+                            if (currentUserPenalty >= 50) {
+                              Swal.fire({
+                                icon: "error",
+                                title: "🚫 Kara Liste",
+                                text: "Hesabınızda 50 veya üzeri ceza puanı bulunduğu için yeni kitap talebinde bulunamazsınız. Lütfen kütüphane yetkilisi ile görüşün.",
+                                background: "#111827", color: "#fff"
+                              });
+                              return;
+                            }
+
+                            let maxLimit = 5;
+                            if (currentUserTrustScore >= 100) maxLimit = 10;
+                            else if (currentUserTrustScore >= 50) maxLimit = 7;
+
+                            if (currentUserActiveBooks >= maxLimit) {
+                              Swal.fire({
+                                icon: "warning",
+                                title: "Limit Doldu",
+                                text: `Güven puanınıza göre belirlenen (${maxLimit} kitap) limitiniz dolmuştur. Lütfen yeni kitap almak için elinizdekileri iade edin.`,
+                                background: "#111827", color: "#fff"
+                              });
+                              return;
+                            }
+
+                            handleOpenRequestModal(book);
+                          }}
+                          style={{
+                            flex: 1, padding: "10px", borderRadius: "12px", 
+                            border: currentUserPenalty >= 50 ? "1px solid rgba(239,68,68,0.2)" : "none", 
+                            cursor: currentUserPenalty >= 50 ? "not-allowed" : "pointer",
+                            background: currentUserPenalty >= 50 ? "rgba(239,68,68,0.05)" : "linear-gradient(135deg,#10b981,#059669)", 
+                            color: currentUserPenalty >= 50 ? "rgba(248,113,113,0.6)" : "#fff",
+                            fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em",
+                            boxShadow: currentUserPenalty >= 50 ? "none" : "0 8px 16px rgba(16,185,129,0.2)",
+                            opacity: currentUserPenalty >= 50 ? 0.8 : 1
+                          }}
+                        >
+                          {currentUserPenalty >= 50 ? "Kilitli (Kara Liste)" : "Ödünç İste"}
+                        </button>
                       ) : (
                         <button disabled style={{
                           flex: 1, padding: "10px", borderRadius: "12px", border: "1px solid rgba(239,68,68,0.12)",
-                          cursor: "not-allowed",
-                          background: "rgba(239,68,68,0.05)",
+                          cursor: "not-allowed", background: "rgba(239,68,68,0.05)",
                           color: "rgba(248,113,113,0.5)",
-                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", transition: "all 0.2s",
-                          opacity: 0.6,
+                          fontSize: "11px", fontWeight: 800, letterSpacing: "0.05em", opacity: 0.6,
                         }}>Ödünçte (Mevcut Değil)</button>
                       )}
                     </div>

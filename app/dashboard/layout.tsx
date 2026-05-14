@@ -41,6 +41,12 @@ const NAV_ITEMS = [
     icon: "⟳",
     roles: ["Admin", "Librarian", "Assistant"] as UserRole[],
   },
+  {
+    href: "/dashboard/reports",
+    label: "Raporlama & Analiz",
+    icon: "📈",
+    roles: ["Admin", "Librarian"] as UserRole[],
+  },
 ];
 
 const ROLE_BADGE: Record<UserRole, { label: string; color: string; bg: string }> = {
